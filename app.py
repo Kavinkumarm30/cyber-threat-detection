@@ -8,30 +8,60 @@ with a confidence score and a plain-language explanation.
 Run with: streamlit run app.py
 """
 
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-from tensorflow.keras.models import load_model
+import tensorflow as tf
+from tensorflow.keras.models import load_model, Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
 
 MODEL_DIR = "models"
 
 st.set_page_config(page_title="AI Cybersecurity Threat Detector", layout="wide")
 
+def load_lstm_safely(feature_cols_count, num_classes=5):
+    # Try direct load with compile=False
+    try:
+        return load_model(f"{MODEL_DIR}/lstm_model.keras", compile=False)
+    except Exception:
+        pass
+
+    try:
+        return load_model(f"{MODEL_DIR}/lstm_model.h5", compile=False)
+    except Exception:
+        pass
+
+    # Fallback: Reconstruct architecture and load weights
+    model = Sequential([
+        LSTM(64, input_shape=(feature_cols_count, 1), return_sequences=True),
+        Dropout(0.3),
+        LSTM(32),
+        Dropout(0.3),
+        Dense(32, activation="relu"),
+        Dense(num_classes, activation="softmax")
+    ])
+    model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+    if os.path.exists(f"{MODEL_DIR}/lstm_weights.h5"):
+        model.load_weights(f"{MODEL_DIR}/lstm_weights.h5")
+    return model
+
 @st.cache_resource
 def load_all_models():
     rf = joblib.load(f"{MODEL_DIR}/rf_model.pkl")
     xgb = joblib.load(f"{MODEL_DIR}/xgb_model.pkl")
-    lstm = load_model(f"{MODEL_DIR}/lstm_model.keras")
     meta_learner = joblib.load(f"{MODEL_DIR}/meta_learner.pkl")
     scaler = joblib.load(f"{MODEL_DIR}/scaler.pkl")
     encoders = joblib.load(f"{MODEL_DIR}/label_encoders.pkl")
     target_encoder = joblib.load(f"{MODEL_DIR}/target_encoder.pkl")
     feature_cols = joblib.load(f"{MODEL_DIR}/feature_cols.pkl")
+    lstm = load_lstm_safely(len(feature_cols), len(target_encoder.classes_))
     return rf, xgb, lstm, meta_learner, scaler, encoders, target_encoder, feature_cols
 
 
 rf, xgb, lstm, meta_learner, scaler, encoders, target_encoder, feature_cols = load_all_models()
+
 
 st.title("🛡️ AI-Powered Cybersecurity Threat Detection")
 st.caption("Hybrid Stacked Ensemble: Random Forest + XGBoost + LSTM + Meta-Learner")
