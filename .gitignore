@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.DS_Store
+.idea/
+.vscode/
+
+# Ignore large raw/processed datasets (over 100MB)
+data/*.csv
+data/*.arff
+data/*.jpg
+data/*.png
+data/*.txt
+!data/kdd_columns.txt
+
