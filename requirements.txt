@@ -5,3 +5,7 @@ scikit-learn
 xgboost
 tensorflow
 joblib
+imbalanced-learn
+shap
+matplotlib
+seaborn
