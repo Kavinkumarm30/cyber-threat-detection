@@ -73,7 +73,10 @@ def load_lstm_safely(feature_cols_count, num_classes=5):
 def load_all_models():
     rf = joblib.load(f"{MODEL_DIR}/rf_model.pkl")
     xgb = joblib.load(f"{MODEL_DIR}/xgb_model.pkl")
-    meta_learner = joblib.load(f"{MODEL_DIR}/meta_learner.pkl")
+    try:
+        meta_learner = joblib.load(f"{MODEL_DIR}/meta_learner.pkl")
+    except Exception:
+        meta_learner = None
     scaler = joblib.load(f"{MODEL_DIR}/scaler.pkl")
     encoders = joblib.load(f"{MODEL_DIR}/label_encoders.pkl")
     target_encoder = joblib.load(f"{MODEL_DIR}/target_encoder.pkl")
@@ -126,9 +129,21 @@ def run_hybrid_prediction(input_df):
     lstm_input = input_df.values.reshape((input_df.shape[0], len(feature_cols), 1))
     lstm_probs = lstm.predict(lstm_input)
 
-    meta_features = np.hstack([rf_probs, xgb_probs, lstm_probs])
-    preds = meta_learner.predict(meta_features)
-    confidences = meta_learner.predict_proba(meta_features).max(axis=1)
+    if meta_learner is not None:
+        try:
+            meta_features = np.hstack([rf_probs, xgb_probs, lstm_probs])
+            preds = meta_learner.predict(meta_features)
+            confidences = meta_learner.predict_proba(meta_features).max(axis=1)
+            return preds, confidences, rf_probs, xgb_probs, lstm_probs
+        except Exception:
+            pass
+
+    # Weighted Ensemble Average fallback (RF 35%, XGB 45%, LSTM 20%)
+    avg_probs = 0.35 * rf_probs + 0.45 * xgb_probs + 0.20 * lstm_probs
+    preds = avg_probs.argmax(axis=1)
+    confidences = avg_probs.max(axis=1)
+    return preds, confidences, rf_probs, xgb_probs, lstm_probs
+
 
     return preds, confidences, rf_probs, xgb_probs, lstm_probs
 
