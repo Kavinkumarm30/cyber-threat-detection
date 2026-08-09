@@ -18,12 +18,15 @@ warnings.filterwarnings("ignore")
 
 # Fix unpickling compatibility across sklearn versions on Cloud environments
 try:
-    import sklearn.ensemble._gb
-    import sklearn._loss
-    if "_loss" not in sys.modules and hasattr(sklearn, "_loss"):
-        sys.modules["_loss"] = sklearn._loss
-except Exception:
-    pass
+    import sklearn._loss._loss as _loss_c_ext
+    sys.modules["_loss"] = _loss_c_ext
+except ImportError:
+    try:
+        import sklearn._loss as _loss_pkg
+        sys.modules["_loss"] = _loss_pkg
+    except Exception:
+        pass
+
 
 import streamlit as st
 import pandas as pd
