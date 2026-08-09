@@ -12,21 +12,8 @@ Run with: streamlit run app.py
 """
 
 import os
-import sys
 import warnings
 warnings.filterwarnings("ignore")
-
-# Fix unpickling compatibility across sklearn versions on Cloud environments
-try:
-    import sklearn._loss._loss as _loss_c_ext
-    sys.modules["_loss"] = _loss_c_ext
-except ImportError:
-    try:
-        import sklearn._loss as _loss_pkg
-        sys.modules["_loss"] = _loss_pkg
-    except Exception:
-        pass
-
 
 import streamlit as st
 import pandas as pd
@@ -35,10 +22,26 @@ import joblib
 import tensorflow as tf
 from tensorflow.keras.models import load_model, Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
+from sklearn.linear_model import LogisticRegression
 
 MODEL_DIR = "models"
 
 st.set_page_config(page_title="AI Cybersecurity Threat Detector", layout="wide")
+
+
+def _load_meta_learner_from_npy():
+    """Reconstruct LogisticRegression from saved numpy arrays (version-safe)."""
+    coef_path = f"{MODEL_DIR}/meta_learner_coef.npy"
+    intercept_path = f"{MODEL_DIR}/meta_learner_intercept.npy"
+    classes_path = f"{MODEL_DIR}/meta_learner_classes.npy"
+    if not all(os.path.exists(p) for p in [coef_path, intercept_path, classes_path]):
+        return None
+    lr = LogisticRegression(max_iter=1000)
+    lr.coef_ = np.load(coef_path)
+    lr.intercept_ = np.load(intercept_path)
+    lr.classes_ = np.load(classes_path)
+    return lr
+
 
 def load_lstm_safely(feature_cols_count, num_classes=5):
     # Try direct load with compile=False
@@ -73,10 +76,7 @@ def load_lstm_safely(feature_cols_count, num_classes=5):
 def load_all_models():
     rf = joblib.load(f"{MODEL_DIR}/rf_model.pkl")
     xgb = joblib.load(f"{MODEL_DIR}/xgb_model.pkl")
-    try:
-        meta_learner = joblib.load(f"{MODEL_DIR}/meta_learner.pkl")
-    except Exception:
-        meta_learner = None
+    meta_learner = _load_meta_learner_from_npy()
     scaler = joblib.load(f"{MODEL_DIR}/scaler.pkl")
     encoders = joblib.load(f"{MODEL_DIR}/label_encoders.pkl")
     target_encoder = joblib.load(f"{MODEL_DIR}/target_encoder.pkl")
@@ -145,7 +145,6 @@ def run_hybrid_prediction(input_df):
     return preds, confidences, rf_probs, xgb_probs, lstm_probs
 
 
-    return preds, confidences, rf_probs, xgb_probs, lstm_probs
 
 
 st.title("🛡️ AI-Powered Cybersecurity Threat Detection")
