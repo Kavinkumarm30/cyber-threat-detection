@@ -3,9 +3,10 @@ pandas
 numpy
 scikit-learn
 xgboost
-tensorflow
+tensorflow-cpu
 joblib
 imbalanced-learn
 shap
 matplotlib
 seaborn
+
